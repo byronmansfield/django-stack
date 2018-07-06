@@ -1,0 +1,29 @@
+version: '2'
+
+services:
+
+  db:
+    image: postgres:9.6
+    hostname: db
+    container_name: db
+    environment:
+      - POSTGRES_USER=postgres
+      - PGPASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432"
+
+  web:
+    image: bmansfield/django-stack:latest
+    hostname: web
+    container_name: web
+    command: ./wait-for-postgres.sh db -- ./venv/bin/python3 manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    labels:
+      io.rancher.container.pull_image: always
+    tty: true
+    depends_on:
+      - db
+    links:
+      - db

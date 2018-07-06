@@ -1,0 +1,39 @@
+language: python
+
+python:
+  - "3.6"
+
+env:
+  global:
+    - DB_NAME=django-test
+    - DB_USER=postgres
+    - DB_PASS="postgres"
+    - DB_HOST=localhost
+    - DB_PORT="5432"
+
+services:
+  - docker
+
+install:
+  - pip install -r requirements.txt
+
+before_script:
+  - docker-compose up -d
+  - ./wait-for-postgres.sh localhost:5432 -- docker-compose run db psql -h db -U postgres -c 'create database django-test;'
+  - docker-compose run web python manage.py makemigrations
+  - docker-compose run web python manage.py migrate
+
+script:
+  - docker-compose run web python manage.py test
+
+after_script:
+  - docker-compose down
+
+after_success:
+  - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+  - export REPO=byronmansfield/django-stack
+  - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH ; fi`
+  - docker build -f Dockerfile -t $REPO:$COMMIT .
+  - docker tag $REPO:$COMMIT $REPO:$TAG
+  - docker tag $REPO:$COMMIT $REPO:travis-$TRAVIS_BUILD_NUMBER
+  - docker push $REPO
