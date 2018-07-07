@@ -11,3 +11,4 @@ coverage
 e2e
 Makefile
 *.example
+env

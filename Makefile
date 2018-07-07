@@ -2,6 +2,8 @@ BUILD_DATE ?= $(strip $(shell date -u +"%Y-%m-%dT%H:%M:%SZ"))
 VERSION ?= $(shell cat VERSION)
 VENDOR ?= bmansfield
 PROJECT_NAME ?= django-stack
+DOCKER_BASE_FILE ?= Dockerfile.base
+DOCKER_BASE_IMAGE ?= $(VENDOR)/django-base
 DOCKER_IMAGE ?= $(VENDOR)/$(PROJECT_NAME)
 ENVIRONMENT ?= development
 REGION ?= us-east-1
@@ -16,14 +18,14 @@ GIT_NOT_CLEAN_CHECK = $(shell git status --porcelain)
 
 default: build
 
-build: docker_build output
+build_base: docker_build_base output
 
+build: docker_build output
 build_clean: docker_build_clean output
 
 run: docker_run output
 
 up: docker_compose_up output
-
 down: docker_compose_down output
 
 push: docker_push
@@ -63,8 +65,15 @@ endif
 #Set DOCKER_TAG
 DOCKER_TAG = $(GIT_TAG)-$(GIT_COMMIT)
 
+# Build Docker Base image
+docker_build_base:
+	docker build \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-f $(DOCKER_BASE_FILE) \
+		-t $(DOCKER_BASE_IMAGE):latest .
+
+# Build Docker image
 docker_build:
-	# Build Docker image
 	docker build \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg VERSION="$(VERSION)" \
@@ -77,8 +86,8 @@ docker_build:
 		-t $(DOCKER_IMAGE):latest \
 		-t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
+# Build Docker fresh image (not from cache)
 docker_build_clean:
-	# Build Docker image
 	docker build \
 		--no-cache \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
@@ -92,8 +101,8 @@ docker_build_clean:
 		-t $(DOCKER_IMAGE):latest \
 		-t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
+# Run Docker container
 docker_run:
-	# Run Docker container
 	docker run \
 		-it \
 		-d \
@@ -102,21 +111,21 @@ docker_run:
 		--name $(PROJECT_NAME) \
 		-t $(DOCKER_IMAGE):$(DOCKER_TAG)
 
+# Tag image as latest
 docker_tag:
-	# Tag image as latest
 	docker tag $(DOCKER_IMAGE):$(DOCKER_TAG) $(DOCKER_IMAGE):latest
 
+# Push to DockerHub
 docker_push:
-	# Push to DockerHub
 	docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
 	docker push $(DOCKER_IMAGE):latest
 
+# cleans out all local images that failed
 docker_image_clean:
-	# cleans out all local images that failed
 	docker rmi -f `docker images | grep "^<none>" | awk "{print $3}"`
 
+# cleans out all local containers
 docker_container_clean:
-	# cleans out all local containers
 	docker rm `docker ps -a -q`
 
 docker_compose_up:
@@ -128,9 +137,9 @@ docker_compose_down:
 	docker-compose \
 		down
 
+# removes created env file
 clean:
-		# removes created env file
-		rm $(ENV_FILE)
+	rm $(ENV_FILE)
 
 output:
-		@echo Docker Image: $(DOCKER_IMAGE):$(DOCKER_TAG)
+	@echo Docker Image: $(DOCKER_IMAGE):$(DOCKER_TAG)
